@@ -1,17 +1,17 @@
-//! Adapter between the mod and Horizon's entity API — the ONLY file here that
-//! touches game internals!
-//!
-//! Before the first build, run (from a horizon-mods clone):
-//!   python3 native/tools/native.py check /path/to/villager-names
-//! It applies the bundle to Horizon's source at your pinned commit and compiles
-//! it: any symbol below that moved is reported with file and line, and the
-//! catalog (native-hooks.json in Horizon's repo) lists the current names.
-//!
-//! Needed surface (map each TODO to the entity helpers of your Nightly):
-//!   1. iterate loaded villagers around the player (loaded chunks);
-//!   2. tell whether an entity already has a custom name;
-//!   3. set/clear the entity's CustomName, with the name tag shown as a name
-//!      tag item shows it in vanilla.
+// Adapter between the mod and Horizon's entity API — the ONLY file here that
+// touches game internals!
+//
+// Before the first build, run (from a horizon-mods clone):
+//   python3 native/tools/native.py check /path/to/villager-names
+// It applies the bundle to Horizon's source at your pinned commit and compiles
+// it: any symbol below that moved is reported with file and line, and the
+// catalog (native-hooks.json in Horizon's repo) lists the current names.
+//
+// Needed surface (map each TODO to the entity helpers of your Nightly):
+//   1. iterate loaded villagers around the player (loaded chunks);
+//   2. tell whether an entity already has a custom name;
+//   3. set/clear the entity's CustomName, with the name tag shown as a name
+//      tag item shows it in vanilla.
 
 pub struct Villager {
     pub network_id: u32,
