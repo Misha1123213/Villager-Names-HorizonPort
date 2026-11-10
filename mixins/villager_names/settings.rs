@@ -5,7 +5,7 @@ fn villager_names_page(game: &mut crate::game::Game<'_>, mod_id: &str, buttons: 
         return;
     }
     for (key, label) in m::OPTION_KEYS {
-        let on = m::option(key, &game.native_setting(m::ID, key));
+        let on = m::option(key, game.native_setting(m::ID, key).as_ref());
         buttons.push(format!("{label}: {}", if on { "ON" } else { "OFF" }));
     }
 }

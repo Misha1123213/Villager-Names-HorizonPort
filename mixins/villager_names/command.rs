@@ -5,18 +5,22 @@ fn villager_names_command(
     ran: &mut bool,
 ) {
     use crate::game::villager_names as m;
+
     let Some(rest) = command.strip_prefix("/villagernames") else {
         return;
     };
     *ran = true;
 
-    let options = m::options_from(&|key| game.native_setting(m::ID, key));
-    let config_dir = game.native_config_dir();
+    let Ok(config_dir) = crate::game::Game::native_config_dir() else {
+        return;
+    };
     m::ensure_custom_names_file(&config_dir);
     let custom = m::load_custom_names(&config_dir);
-    let mut rng = m::Rng::new();
 
+    let options = m::options_from(&|key| game.native_setting(m::ID, key));
+    let mut rng = m::Rng::new();
     let loaded = crate::game::villager_names_entities::villagers(game, options.name_modded);
+
     match rest.trim() {
         "" | "name" => {
             let mut count = 0usize;
