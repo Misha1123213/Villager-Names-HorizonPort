@@ -1,0 +1,8 @@
+[package]
+name = "villager_names"
+version = "1.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "mixins/villager_names/runtime.rs"

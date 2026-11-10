@@ -1,0 +1,6 @@
+{
+  "hook_points": 26,
+  "horizon_mixins_revision": "d9c83d7",
+  "tested": [],
+  "note": "Hook points only: builds on any Nightly with hook points >= 26. If the launcher reports a hook_version below the catalog's, raise it in horizon-mixin.toml."
+}
