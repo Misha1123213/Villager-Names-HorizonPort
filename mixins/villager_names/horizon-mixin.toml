@@ -6,8 +6,6 @@ priority = 100
 [compatibility]
 horizon_revision = "fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca"
 
-# runtime.rs becomes the module crate::game::villager_names;
-# villagers.rs is its entity-API adapter.
 [[module]]
 id = "runtime"
 file = "crates/horizon-client/src/game.rs"
@@ -20,14 +18,28 @@ file = "crates/horizon-client/src/game.rs"
 name = "villager_names_entities"
 source = "villagers.rs"
 
+# Opt in to server entity tick notifications; filter villager kinds in the Pre hook.
 [[injection]]
-id = "tick"
+id = "entity_tick_listened"
 kind = "HEAD"
-hook = "tick"
+hook = "entity_tick_listened"
 hook_version = 1
-helper = "tick.rs"
+helper = "tick_listened.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "listened", ty = "&mut bool", value = "&mut *listened" },
+]
+
+[[injection]]
+id = "entity_tick"
+kind = "HEAD"
+hook = "entity_tick_pre"
+hook_version = 1
+helper = "entity_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "entity_id", ty = "u32", value = "entity" },
+  { name = "kind", ty = "&str", value = "kind" },
 ]
 
 [[injection]]

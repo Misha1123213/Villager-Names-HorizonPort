@@ -1,46 +1,105 @@
-// Adapter between the mod and Horizon's entity API — the ONLY file here that
-// touches game internals!
-//
-// Before the first build, run (from a horizon-mods clone):
-//   python3 native/tools/native.py check /path/to/villager-names
-// It applies the bundle to Horizon's source at your pinned commit and compiles
-// it: any symbol below that moved is reported with file and line, and the
-// catalog (native-hooks.json in Horizon's repo) lists the current names.
-//
-// Needed surface (map each TODO to the entity helpers of your Nightly):
-//   1. iterate loaded villagers around the player (loaded chunks);
-//   2. tell whether an entity already has a custom name;
-//   3. set/clear the entity's CustomName, with the name tag shown as a name
-//      tag item shows it in vanilla.
+// Adapter between the mod and Horizon's entity API — the only file here that
+// touches game internals. Entity handles and entity NBT follow the native-mod
+// API at the pinned Horizon revision.
 
+use horizon_world::nbt::{Compound, Tag};
+
+#[derive(Clone, Copy)]
 pub struct Villager {
     pub network_id: u32,
 }
 
-/// All villagers currently loaded. `include_modded` also takes modded
-/// villagers (content-mod types on a minecraft:villager template).
+/// Whether a type is a vanilla villager or wandering trader. With
+/// `include_modded`, also accept mod namespaces whose type id identifies a
+/// villager (for example `example:desert_villager`).
+pub fn is_villager_kind(kind: &str, include_modded: bool) -> bool {
+    if matches!(kind, "minecraft:villager" | "minecraft:wandering_trader") {
+        return true;
+    }
+    include_modded
+        && kind
+            .split_once(':')
+            .is_some_and(|(namespace, path)| namespace != "minecraft" && path.contains("villager"))
+}
+
+/// All loaded living villagers in the current server level.
 pub fn villagers(game: &mut crate::game::Game<'_>, include_modded: bool) -> Vec<Villager> {
-    // TODO(verify): replace with the entity query helper from your Nightly,
-    // e.g. the helpers added under "Entities for server mods" (summon, move,
-    // display transforms) — filter by type id "minecraft:villager" (plus
-    // "minecraft:wandering_trader" and modded villager types if wanted).
-    let _ = (game, include_modded);
-    Vec::new()
+    let dimension = game.dim.id();
+    game.native_mobs(dimension)
+        .into_iter()
+        .filter(|mob| is_villager_kind(&mob.kind, include_modded))
+        .map(|mob| Villager { network_id: mob.id })
+        .collect()
 }
 
+fn entity_ref(
+    game: &crate::game::Game<'_>,
+    villager: Villager,
+) -> Option<horizon_client::mod_api::EntityRef> {
+    game.native_entity(villager.network_id)
+}
+
+/// Whether the entity has a non-empty custom-name component.
 pub fn has_custom_name(game: &mut crate::game::Game<'_>, villager: Villager) -> bool {
-    // TODO(verify): read the entity's CustomName component.
-    let _ = (game, villager);
-    false
+    let Some(entity) = entity_ref(game, villager) else {
+        return false;
+    };
+    let Some(nbt) = game.native_entity_nbt(entity) else {
+        return false;
+    };
+    match nbt.get(&"CustomName".into()) {
+        Some(Tag::String(value)) => !value.trim().is_empty() && value.trim() != "\"\"",
+        _ => false,
+    }
 }
 
-/// Name the villager: sets CustomName so the name tag renders above the head
-/// and the name shows on the trade screen, exactly like a renamed name tag.
+/// Set CustomName and show the name tag, as a renamed name tag does.
 pub fn set_custom_name(game: &mut crate::game::Game<'_>, villager: Villager, name: &str) {
-    // TODO(verify): set the entity's CustomName and mark the tag visible.
-    let _ = (game, villager, name);
+    let Some(entity) = entity_ref(game, villager) else {
+        return;
+    };
+    let Ok(component) = serde_json::to_string(name) else {
+        return;
+    };
+    let mut nbt = Compound::new();
+    nbt.insert("CustomName".into(), Tag::String(component));
+    nbt.insert("CustomNameVisible".into(), Tag::Byte(1));
+    let _ = game.native_entity_merge_nbt(entity, nbt);
 }
 
+/// Clear a custom name and hide its name tag.
 pub fn clear_custom_name(game: &mut crate::game::Game<'_>, villager: Villager) {
-    set_custom_name(game, villager, "");
+    let Some(entity) = entity_ref(game, villager) else {
+        return;
+    };
+    let mut nbt = Compound::new();
+    nbt.insert("CustomName".into(), Tag::String("\"\"".to_owned()));
+    nbt.insert("CustomNameVisible".into(), Tag::Byte(0));
+    let _ = game.native_entity_merge_nbt(entity, nbt);
+}
+
+/// Called from entity_tick_pre for the villager kinds this mod supports.
+pub fn on_entity_tick(
+    game: &mut crate::game::Game<'_>,
+    entity_id: u32,
+    kind: &str,
+) {
+    use crate::game::villager_names as m;
+    if !is_villager_kind(kind, true) {
+        return;
+    }
+    let villager = Villager { network_id: entity_id };
+    if has_custom_name(game, villager) {
+        return;
+    }
+    let options = m::options_from(&|key| game.native_setting(m::ID, key));
+    let Ok(config_dir) = crate::game::Game::native_config_dir() else {
+        return;
+    };
+    m::ensure_custom_names_file(&config_dir);
+    let custom = m::load_custom_names(&config_dir);
+    let mut rng = m::Rng::new();
+    if let Some(name) = m::pick_name(&mut rng, &options, &custom) {
+        set_custom_name(game, villager, &name);
+    }
 }
