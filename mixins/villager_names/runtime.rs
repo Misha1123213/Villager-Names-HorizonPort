@@ -102,12 +102,12 @@ pub fn option(key: &str, value: Option<&String>) -> bool {
 
 pub fn options_from(get: &dyn Fn(&str) -> Option<String>) -> Options {
     Options {
-        use_custom: option("use_custom", &get("use_custom")),
-        use_male: option("use_male", &get("use_male")),
-        use_female: option("use_female", &get("use_female")),
-        use_both: option("use_both", &get("use_both")),
-        name_modded: option("name_modded", &get("name_modded")),
-        capitalize: option("capitalize", &get("capitalize")),
+        use_custom: option("use_custom", get("use_custom").as_ref()),
+        use_male: option("use_male", get("use_male").as_ref()),
+        use_female: option("use_female", get("use_female").as_ref()),
+        use_both: option("use_both", get("use_both").as_ref()),
+        name_modded: option("name_modded", get("name_modded").as_ref()),
+        capitalize: option("capitalize", get("capitalize").as_ref()),
     }
 }
 
