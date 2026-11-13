@@ -60,7 +60,7 @@ pub fn set_custom_name(game: &mut crate::game::Game<'_>, entity_id: u32, name: &
         return false;
     };
     let nbt: Compound = [
-                      ("CustomName".into(), Tag::String(name.as_str().into())),
+                             ("CustomName".into(), Tag::String(name.into())),
         ("CustomNameVisible".into(), Tag::Byte(0)),
     ]
     .into();
