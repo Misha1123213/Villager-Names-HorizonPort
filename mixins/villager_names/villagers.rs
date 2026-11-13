@@ -50,7 +50,7 @@ pub fn has_custom_name(game: &mut crate::game::Game<'_>, entity_id: u32) -> bool
         return false;
     };
     match nbt.get(&"CustomName".into()) {
-        Some(Tag::String(raw)) => !raw.trim().trim_matches('"').trim().is_empty(),
+                Some(Tag::String(raw)) => raw.0 != "\"\"".encode_utf16().collect::<Vec<u16>>(),
         _ => false,
     }
 }
@@ -60,7 +60,7 @@ pub fn set_custom_name(game: &mut crate::game::Game<'_>, entity_id: u32, name: &
         return false;
     };
     let nbt: Compound = [
-        ("CustomName".into(), Tag::String(format!("\"{name}\""))),
+                ("CustomName".into(), Tag::String(format!("\"{name}\"").as_str().into())),
         ("CustomNameVisible".into(), Tag::Byte(1)),
     ]
     .into();
