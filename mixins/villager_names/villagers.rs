@@ -1,12 +1,16 @@
 // Adapter between the mod and Horizon's entity API: the only file here that
-// talks to game internals. Entity handles and entity data reads/writes per
-// docs/native-mods.md ("Entity and level handles") and native-hooks.json at
-// the pinned commit.
+// talks to game internals. Signatures verified against the fdc87ae source:
+// entity_tick_pre(dimension, entity: u32, kind, canceled), and the entity
+// helpers native_entity(id), native_entity_nbt/merge_nbt(entity, ...),
+// native_entity_uuid(entity).
 //
 // Naming writes CustomName (a JSON text component) and CustomNameVisible
 // through native_entity_merge_nbt, exactly what /data merge entity writes;
 // the name tag renders as a renamed name tag's, and the name is saved with
 // the entity, as in the original Java mod.
+//
+// Everything here is id-based: each call resolves the EntityRef handle
+// locally, so no handle crosses a function boundary twice.
 
 use horizon_world::nbt::{Compound, Tag};
 
@@ -16,43 +20,32 @@ pub fn is_villager_kind(kind: &str) -> bool {
     VILLAGER_KINDS.contains(&kind)
 }
 
-pub fn is_villager_id(game: &mut crate::game::Game<'_>, entity_id: u32) -> bool {
-    let Some(entity) = game.native_entity(entity_id) else {
-        return false;
-    };
-    game.native_entity_kind(entity)
-        .is_some_and(|kind| is_villager_kind(&kind))
-}
-
-pub fn on_entity_tick(game: &mut crate::game::Game<'_>, entity_id: u32) {
+pub fn on_entity_tick(game: &mut crate::game::Game<'_>, entity_id: u32, kind: &str) {
     use crate::game::villager_names as m;
     if m::tracker().lock().unwrap().knows_id(entity_id) {
         return;
     }
+    if !is_villager_kind(kind) {
+        return;
+    }
     let Some(entity) = game.native_entity(entity_id) else {
         return;
     };
-    let Some(kind) = game.native_entity_kind(entity) else {
-        return;
-    };
-    if !is_villager_kind(&kind) {
-        return;
-    }
     let Some(uuid) = game.native_entity_uuid(entity) else {
         return;
     };
     m::tracker().lock().unwrap().seen(entity_id, uuid);
-    if has_custom_name(game, entity) {
+    if has_custom_name(game, entity_id) {
         m::tracker().lock().unwrap().mark_processed(uuid);
         return;
     }
-    let _ = name_villager(game, entity, uuid);
+    let _ = name_villager(game, entity_id, uuid);
 }
 
-pub fn has_custom_name(
-    game: &mut crate::game::Game<'_>,
-    entity: horizon_client::mod_api::EntityRef,
-) -> bool {
+pub fn has_custom_name(game: &mut crate::game::Game<'_>, entity_id: u32) -> bool {
+    let Some(entity) = game.native_entity(entity_id) else {
+        return false;
+    };
     let Some(nbt) = game.native_entity_nbt(entity) else {
         return false;
     };
@@ -62,11 +55,10 @@ pub fn has_custom_name(
     }
 }
 
-pub fn set_custom_name(
-    game: &mut crate::game::Game<'_>,
-    entity: horizon_client::mod_api::EntityRef,
-    name: &str,
-) -> bool {
+pub fn set_custom_name(game: &mut crate::game::Game<'_>, entity_id: u32, name: &str) -> bool {
+    let Some(entity) = game.native_entity(entity_id) else {
+        return false;
+    };
     let nbt: Compound = [
         ("CustomName".into(), Tag::String(format!("\"{name}\""))),
         ("CustomNameVisible".into(), Tag::Byte(1)),
@@ -75,10 +67,10 @@ pub fn set_custom_name(
     game.native_entity_merge_nbt(entity, nbt)
 }
 
-pub fn clear_custom_name(
-    game: &mut crate::game::Game<'_>,
-    entity: horizon_client::mod_api::EntityRef,
-) -> bool {
+pub fn clear_custom_name(game: &mut crate::game::Game<'_>, entity_id: u32) -> bool {
+    let Some(entity) = game.native_entity(entity_id) else {
+        return false;
+    };
     let nbt: Compound = [
         ("CustomName".into(), Tag::String("\"\"".into())),
         ("CustomNameVisible".into(), Tag::Byte(0)),
@@ -87,11 +79,7 @@ pub fn clear_custom_name(
     game.native_entity_merge_nbt(entity, nbt)
 }
 
-pub fn name_villager(
-    game: &mut crate::game::Game<'_>,
-    entity: horizon_client::mod_api::EntityRef,
-    uuid: u128,
-) -> bool {
+pub fn name_villager(game: &mut crate::game::Game<'_>, entity_id: u32, uuid: u128) -> bool {
     use crate::game::villager_names as m;
     let options = m::options_from(&|key| game.native_setting(m::ID, key));
     let Ok(config_dir) = crate::game::Game::native_config_dir() else {
@@ -101,16 +89,16 @@ pub fn name_villager(
     let custom = m::load_custom_names(&config_dir);
     let mut rng = m::Rng::new();
     let named = m::pick_name(&mut rng, &options, &custom)
-        .is_some_and(|name| set_custom_name(game, entity, &name));
+        .is_some_and(|name| set_custom_name(game, entity_id, &name));
     if named {
         m::tracker().lock().unwrap().mark_processed(uuid);
     }
     named
 }
 
-pub fn live_villagers(
-    game: &mut crate::game::Game<'_>,
-) -> Vec<(horizon_client::mod_api::EntityRef, u128)> {
+// Villagers the tracker knows, re-validated against the world (ids are
+// reused; each candidate must still exist and still be a villager).
+pub fn live_villagers(game: &mut crate::game::Game<'_>) -> Vec<(u32, u128)> {
     use crate::game::villager_names as m;
     let mut out = Vec::new();
     let tracked = m::tracker().lock().unwrap().villagers();
@@ -118,11 +106,11 @@ pub fn live_villagers(
         let Some(entity) = game.native_entity(id) else {
             continue;
         };
-        let Some(kind) = game.native_entity_kind(entity) else {
-            continue;
-        };
-        if is_villager_kind(&kind) {
-            out.push((entity, uuid));
+        if game
+            .native_entity_kind(entity)
+            .is_some_and(|k| is_villager_kind(&k))
+        {
+            out.push((id, uuid));
         }
     }
     out

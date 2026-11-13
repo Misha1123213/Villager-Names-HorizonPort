@@ -14,15 +14,15 @@ fn villager_names_command(
     match rest.trim() {
         "" | "name" => {
             let mut count = 0usize;
-            for (entity, uuid) in villagers {
+            for (id, uuid) in villagers {
                 if m::tracker().lock().unwrap().is_processed(uuid) {
                     continue;
                 }
-                if crate::game::villager_names_entities::has_custom_name(game, entity) {
+                if crate::game::villager_names_entities::has_custom_name(game, id) {
                     m::tracker().lock().unwrap().mark_processed(uuid);
                     continue;
                 }
-                if crate::game::villager_names_entities::name_villager(game, entity, uuid) {
+                if crate::game::villager_names_entities::name_villager(game, id, uuid) {
                     count += 1;
                 }
             }
@@ -30,16 +30,16 @@ fn villager_names_command(
         }
         "rename" => {
             let mut count = 0usize;
-            for (entity, uuid) in villagers {
-                if crate::game::villager_names_entities::name_villager(game, entity, uuid) {
+            for (id, uuid) in villagers {
+                if crate::game::villager_names_entities::name_villager(game, id, uuid) {
                     count += 1;
                 }
             }
             game.native_chat(&format!("[Villager Names] Renamed {count} villagers."));
         }
         "unname" => {
-            for (entity, uuid) in villagers {
-                let _ = crate::game::villager_names_entities::clear_custom_name(game, entity);
+            for (id, uuid) in villagers {
+                let _ = crate::game::villager_names_entities::clear_custom_name(game, id);
                 m::tracker().lock().unwrap().mark_processed(uuid);
             }
             game.native_chat("[Villager Names] Removed all villager names.");

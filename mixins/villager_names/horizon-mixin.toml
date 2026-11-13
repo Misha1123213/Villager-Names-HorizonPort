@@ -4,7 +4,7 @@ version = "1.0.0"
 priority = 100
 
 [compatibility]
-horizon_revision = "d91cab68ded29bd2b004f7050c468fb98c41a00b"
+horizon_revision = "fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca"
 
 [[module]]
 id = "runtime"
@@ -26,7 +26,6 @@ hook_version = 1
 helper = "tick_listened.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "entity_id", ty = "u32", value = "entity_id" },
   { name = "listened", ty = "&mut bool", value = "&mut *listened" },
 ]
 
@@ -38,7 +37,9 @@ hook_version = 1
 helper = "entity_tick.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "entity_id", ty = "u32", value = "entity_id" },
+  { name = "_dimension", ty = "&str", value = "dimension" },
+  { name = "entity", ty = "u32", value = "entity" },
+  { name = "kind", ty = "&str", value = "kind" },
 ]
 
 [[injection]]
