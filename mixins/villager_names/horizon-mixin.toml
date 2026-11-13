@@ -4,7 +4,7 @@ version = "1.0.0"
 priority = 100
 
 [compatibility]
-horizon_revision = "fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca"
+horizon_revision = "d91cab68ded29bd2b004f7050c468fb98c41a00b"
 
 # runtime.rs becomes the module crate::game::villager_names;
 # villagers.rs is its entity-API adapter.
