@@ -50,7 +50,7 @@ pub fn has_custom_name(game: &mut crate::game::Game<'_>, entity_id: u32) -> bool
         return false;
     };
     match nbt.get(&"CustomName".into()) {
-                        Some(Tag::String(raw)) => !raw.0.is_empty(),
+                        Some(Tag::String(raw)) => !raw.0.is_empty() && raw.0.first() != Some(&0x22),
         _ => false,
     }
 }
