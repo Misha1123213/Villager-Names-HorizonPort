@@ -1,4 +1,3 @@
-// The mod's row in Options > Mods.
 fn villager_names_listed(mods: &mut Vec<crate::game::native_hooks::NativeMod>) {
     use crate::game::villager_names as m;
     mods.push(crate::game::native_hooks::NativeMod {
